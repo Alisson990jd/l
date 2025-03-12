@@ -13,7 +13,7 @@ jobs:
       - name: Install required dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients virt-manager bridge-utils dnsmasq-base tightvncserver wget tar
+          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients virt-manager bridge-utils dnsmasq-base wget tar
 
       - name: Download BlissOS ISO
         run: |
@@ -25,32 +25,25 @@ jobs:
           tar -xvzf ngrok-v3-stable-linux-amd64.tgz
           ./ngrok authtoken 1vgZrCA9yJDURy3OK1gNbS2G610_3CX2e2bqT4Ee88uMBk5he
 
-      - name: Start VNC server
-        run: |
-          mkdir -p ~/.vnc
-          echo "password" | vncpasswd -f > ~/.vnc/passwd
-          chmod 600 ~/.vnc/passwd
-          vncserver :1 -geometry 1024x768 -depth 24 &
-
       - name: Expose VNC with ngrok
         run: |
-          ./ngrok tcp 5901 --log=stdout > ngrok.log &
+          ./ngrok tcp 5900 --log=stdout > ngrok.log &
           sleep 10
           NGROK_URL=$(grep -o 'tcp://[^ ]*' ngrok.log | sed 's/tcp:\/\//http:\/\/0.tcp.ngrok.io:/')
           echo "Ngrok URL: $NGROK_URL"
           echo "VNC Access: Use the above URL and port to connect via VNC."
 
-      - name: Start BlissOS VM with QEMU
+      - name: Start BlissOS VM with QEMU (with built-in VNC)
         run: |
           qemu-system-x86_64 \
             -m 4096 \
             -smp 4 \
             -vga std \
-            -display none \
+            -display vnc=:0 \
             -cdrom blissos.iso \
             -boot d \
             -net nic,model=virtio \
-            -net user,hostfwd=tcp::5901-:5901 \
+            -net user,hostfwd=tcp::2222-:22 \
             -daemonize
           echo "BlissOS VM started. Connect via VNC using the ngrok URL."
 
