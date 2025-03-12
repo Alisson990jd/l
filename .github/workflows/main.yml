@@ -1,0 +1,61 @@
+name: Create BlissOS VM with VNC and Ngrok
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-vm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install required dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients virt-manager bridge-utils dnsmasq-base tightvncserver wget tar
+
+      - name: Download BlissOS ISO
+        run: |
+          wget -O blissos.iso "https://downloads.sourceforge.net/project/blissos-x86/Official/BlissOS15/Gapps/Generic/Bliss-v15.8.6-x86_64-OFFICIAL-gapps-20230703.iso?ts=gAAAAABn0WCq0-yWJyWTgrHWb7V616GkgULiqSzp9pWXWEe6Y5FGRDg4RrKn6-abZZPToaKbAEx-LusdLnSKzOG5P0qrIL3Cfw%3D%3D&use_mirror=cfhcable&r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fblissos-x86%2Ffiles%2FOfficial%2FBlissOS15%2FGapps%2FGeneric%2F"
+
+      - name: Download and install ngrok
+        run: |
+          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+          tar -xvzf ngrok-v3-stable-linux-amd64.tgz
+          ./ngrok authtoken 1vgZrCA9yJDURy3OK1gNbS2G610_3CX2e2bqT4Ee88uMBk5he
+
+      - name: Start VNC server
+        run: |
+          mkdir -p ~/.vnc
+          echo "password" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
+          vncserver :1 -geometry 1024x768 -depth 24 &
+
+      - name: Expose VNC with ngrok
+        run: |
+          ./ngrok tcp 5901 --log=stdout > ngrok.log &
+          sleep 10
+          NGROK_URL=$(grep -o 'tcp://[^ ]*' ngrok.log | sed 's/tcp:\/\//http:\/\/0.tcp.ngrok.io:/')
+          echo "Ngrok URL: $NGROK_URL"
+          echo "VNC Access: Use the above URL and port to connect via VNC."
+
+      - name: Start BlissOS VM with QEMU
+        run: |
+          qemu-system-x86_64 \
+            -m 4096 \
+            -smp 4 \
+            -vga std \
+            -display none \
+            -cdrom blissos.iso \
+            -boot d \
+            -net nic,model=virtio \
+            -net user,hostfwd=tcp::5901-:5901 \
+            -daemonize
+          echo "BlissOS VM started. Connect via VNC using the ngrok URL."
+
+      - name: Keep VM running for 3 hours
+        run: |
+          echo "VM will stay online for 3 hours..."
+          sleep 10800 # 3 hours = 3 * 60 * 60 seconds
+          echo "Shutting down VM after 3 hours."
