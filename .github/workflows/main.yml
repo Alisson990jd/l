@@ -1,4 +1,4 @@
-name: Create Android-x86 VM with VNC and Ngrok
+name: Create PrimeOS VM with VNC and Ngrok
 
 on:
   workflow_dispatch:
@@ -15,9 +15,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients virt-manager bridge-utils dnsmasq-base wget tar
 
-      - name: Download Android-x86 ISO
+      - name: Download PrimeOS ISO
         run: |
-          wget -O android-x86.iso "https://downloads.sourceforge.net/project/android-x86/Release%209.0/android-x86_64-9.0-r2.iso?ts=gAAAAABn0XMq9eFOcVhJ11mQrWnlrNBY1DliTCEGE18fQzu0GjcHqOilnvxunqrEmN4jAb6UwvCQ8fHQi5KgsstXvaOb1RBE_g%3D%3D&use_mirror=cfhcable&r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fandroid-x86%2Ffiles%2FRelease%25209.0%2F"
+          wget -O primeos.iso "https://downloads.sourceforge.net/project/primeos/64-bit/PrimeOS-2.1.3-64-bit-20220719-BETA.iso?ts=gAAAAABn0XgtKaPRQ81fa6zYqg4fJ5PfWxx-mMPtqWCyzQZs8K1BSX-knYyANm8IoX3Eg-mEqW2nRQdhTVsStLB2Xy5mlL0tGg%3D%3D&use_mirror=cfhcable&r=https%3A%2F%2Fwww.primeos.in%2F"
 
       - name: Download and install ngrok
         run: |
@@ -33,19 +33,19 @@ jobs:
           echo "Ngrok URL: $NGROK_URL"
           echo "VNC Access: Use the above URL and port to connect via VNC."
 
-      - name: Start Android-x86 VM with QEMU (with built-in VNC)
+      - name: Start PrimeOS VM with QEMU (with built-in VNC)
         run: |
           qemu-system-x86_64 \
             -m 4096 \
             -smp 4 \
             -vga std \
             -display vnc=:0 \
-            -cdrom android-x86.iso \
+            -cdrom primeos.iso \
             -boot d \
             -net nic,model=virtio \
             -net user,hostfwd=tcp::2222-:22 \
             -daemonize
-          echo "Android-x86 VM started. Connect via VNC using the ngrok URL."
+          echo "PrimeOS VM started. Connect via VNC using the ngrok URL."
 
       - name: Keep VM running for 3 hours
         run: |
