@@ -8,6 +8,8 @@ T0=time.time(); log=lambda *a: print(f"[{time.time()-T0:5.0f}s]",*a,flush=True)
 g=pd.read_parquet(sys.argv[1]); C=json.load(open(sys.argv[1]+".cols.json")); OUTD=sys.argv[2]; os.makedirs(OUTD,exist_ok=True)
 DEVICE=os.environ.get("XGB_DEVICE","cpu"); NJ=int(os.environ.get("N_JOBS","4"))
 g["year"]=g.date.dt.year; y=g.result.values
+_dup=g.assign(_d=g.date.dt.normalize()).duplicated(["_d","home_team_id","away_team_id"]).sum()
+assert _dup==0, f"{_dup} duplicated matches (same day and teams): they leak results into features, rebuild features2"
 hd=lambda cs:[f"{c}_{s}" for c in cs for s in("h","a","d")]
 base_team=[c for c in C["TEAM"] if c.split("_r")[0] in("gf","ga","pts") or c.split("_ew")[0] in("gf","ga","pts")]
 stats_team=[c for c in C["TEAM"] if (c.endswith(("_r5","_r10","_ew"))) and c not in base_team]

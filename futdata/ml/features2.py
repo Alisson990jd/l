@@ -5,7 +5,14 @@ D=sys.argv[1]+"/data/api_football/"; OUT=sys.argv[2]; T0=time.time()
 def log(*a): print(f"[{time.time()-T0:5.0f}s]",*a,flush=True)
 f=pd.read_parquet(D+"fixtures.parquet",columns=["id","date_utc","league_id","home_team_id","away_team_id","goals_home","goals_away","is_played","referee_name"])
 f=f[f.is_played&f.goals_home.notna()].rename(columns={"id":"fixture_id","date_utc":"date"}).copy()
-f["date"]=pd.to_datetime(f.date); f=f.sort_values(["date","fixture_id"]).reset_index(drop=True)
+f["date"]=pd.to_datetime(f.date)
+# The source lists many matches twice under two league ids (same day, teams and score). A duplicate would leak the
+# result into the second copy's form/Elo features, so keep one copy per match: the one with the most detail.
+rich=sum(f.fixture_id.isin(pd.read_parquet(D+t,columns=["fixture_id"]).fixture_id).astype(int)*w
+         for t,w in (("odds.parquet",4),("match_stats.parquet",2),("fixture_lineups.parquet",1)))
+n0=len(f); f=f.assign(_r=rich,_day=f.date.dt.normalize()).sort_values(["_r","fixture_id"],ascending=[False,True])
+f=f.drop_duplicates(["_day","home_team_id","away_team_id"]).drop(columns=["_r","_day"])
+f=f.sort_values(["date","fixture_id"]).reset_index(drop=True); log("dedup",n0,"->",len(f))
 f["hg"]=f.goals_home.astype(int); f["ag"]=f.goals_away.astype(int); f["result"]=np.select([f.hg>f.ag,f.hg==f.ag],[0,1],2)
 odds=pd.read_parquet(D+"odds.parquet"); odds=odds.sort_values("bookmaker").drop_duplicates("fixture_id")  # prefer one bookmaker row (Pinnacle sorts after Bet365 -> keep first? fix below)
 odds=pd.read_parquet(D+"odds.parquet"); odds["pri"]=(odds.bookmaker!="Pinnacle").astype(int); odds=odds.sort_values("pri").drop_duplicates("fixture_id")
