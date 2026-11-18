@@ -1,0 +1,45 @@
+name: FutData GPU training (Modal)
+
+on:
+  push:
+    branches: [ccr-0647417b-rfdrph]
+    paths: ["futdata/ml/**", ".github/workflows/futdata-train.yml"]
+  workflow_dispatch:
+    inputs:
+      trials:
+        description: "Optuna trials"
+        default: "60"
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets
+        run: |
+          if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ] || [ -z "$HF_TOKEN" ]; then
+            echo "::error::Add MODAL_TOKEN_ID, MODAL_TOKEN_SECRET and HF_TOKEN in Settings > Secrets and variables > Actions"; exit 1
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install modal==1.6.4 huggingface_hub
+      - name: Train on Modal GPU
+        run: modal run futdata/ml/modal_train.py --trials ${{ inputs.trials || '60' }}
+      - name: Upload results to Hugging Face
+        if: always()
+        run: |
+          python - <<'PY'
+          import os, datetime
+          from huggingface_hub import HfApi
+          if os.path.isdir("ml_results"):
+              d = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M")
+              HfApi().upload_folder(repo_id="Alisson990/futdata", repo_type="dataset", folder_path="ml_results",
+                                    path_in_repo=f"ml/results/{d}", commit_message=f"ML results {d}")
+              print("uploaded ml/results/" + d)
+          PY
